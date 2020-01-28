@@ -214,3 +214,4 @@ include(GNUInstallDirs)
 include(configure/coveralls.cmake)
 
 option(TANGO_COMPILE_TEST_SUITE "Compile the test suite" ON)
+option(TANGO_JPEG_MMX "Build MMX support" ON)
