@@ -2865,54 +2865,67 @@ void Attribute::delete_seq()
 	case Tango::DEV_SHORT:
 	case Tango::DEV_ENUM:
 		delete value.sh_seq;
+		value.sh_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_LONG:
 		delete value.lg_seq;
+		value.lg_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_LONG64:
 		delete value.lg64_seq;
+		value.lg64_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_DOUBLE:
 		delete value.db_seq;
+		value.db_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_STRING:
 		delete value.str_seq;
+		value.str_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_FLOAT:
 		delete value.fl_seq;
+		value.fl_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_USHORT:
 		delete value.ush_seq;
+		value.ush_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_UCHAR:
 		delete value.cha_seq;
+		value.cha_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_BOOLEAN:
 		delete value.boo_seq;
+		value.boo_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_ULONG:
 		delete value.ulg_seq;
+		value.ulg_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_ULONG64:
 		delete value.ulg64_seq;
+		value.ulg64_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_STATE:
 		delete value.state_seq;
+		value.state_seq = Tango_nullptr;
 		break;
 
 	case Tango::DEV_ENCODED:
 		delete value.enc_seq;
+		value.enc_seq = Tango_nullptr;
 		break;
 	}
 }
@@ -3774,9 +3787,13 @@ void Attribute::fire_change_event(DevFailed *except)
 		time_t change3_subscription,change4_subscription,change5_subscription;
 
 		now = time(NULL);
-		change3_subscription = now - event_change3_subscription;
-		change4_subscription = now - event_change4_subscription;
-		change5_subscription = now - event_change5_subscription;
+
+		{
+			omni_mutex_lock oml(EventSupplier::get_event_mutex());
+			change3_subscription = now - event_change3_subscription;
+			change4_subscription = now - event_change4_subscription;
+			change5_subscription = now - event_change5_subscription;
+		}
 
 //
 // Get the event supplier(s)
@@ -4017,54 +4034,58 @@ void Attribute::fire_change_event(DevFailed *except)
 			bool force_change   = false;
 			bool quality_change = false;
 
-			if ((except != NULL) ||
-				(quality == Tango::ATTR_INVALID) ||
-				((except == NULL) && (prev_change_event.err == true)) ||
-				((quality != Tango::ATTR_INVALID) &&
-				(prev_change_event.quality == Tango::ATTR_INVALID)))
-			{
-				force_change = true;
-			}
-
 			vector<string> filterable_names;
 			vector<double> filterable_data;
 			vector<string> filterable_names_lg;
 			vector<long> filterable_data_lg;
 
-			if (except != NULL)
 			{
-				prev_change_event.err    = true;
-				prev_change_event.except = *except;
-			}
-			else
-			{
-				Tango::AttrQuality the_quality;
+				omni_mutex_lock oml(EventSupplier::get_event_mutex());
 
-				if (send_attr_5 != NULL)
+				if ((except != NULL) ||
+					(quality == Tango::ATTR_INVALID) ||
+					((except == NULL) && (prev_change_event.err == true)) ||
+					((quality != Tango::ATTR_INVALID) &&
+					(prev_change_event.quality == Tango::ATTR_INVALID)))
 				{
-					the_quality = send_attr_5->quality;
-					prev_change_event.value_4 = send_attr_5->value;
+					force_change = true;
 				}
-				else if (send_attr_4 != NULL)
+
+				if (except != NULL)
 				{
-					the_quality = send_attr_4->quality;
-					prev_change_event.value_4 = send_attr_4->value;
+					prev_change_event.err    = true;
+					prev_change_event.except = *except;
 				}
 				else
 				{
-					the_quality = send_attr->quality;
-					prev_change_event.value = send_attr->value;
-				}
+					Tango::AttrQuality the_quality;
 
-				if (prev_change_event.quality !=  the_quality)
-				{
-					quality_change = true;
-				}
+					if (send_attr_5 != NULL)
+					{
+						the_quality = send_attr_5->quality;
+						prev_change_event.value_4 = send_attr_5->value;
+					}
+					else if (send_attr_4 != NULL)
+					{
+						the_quality = send_attr_4->quality;
+						prev_change_event.value_4 = send_attr_4->value;
+					}
+					else
+					{
+						the_quality = send_attr->quality;
+						prev_change_event.value = send_attr->value;
+					}
 
-				prev_change_event.quality = the_quality;
-				prev_change_event.err = false;
+					if (prev_change_event.quality !=  the_quality)
+					{
+						quality_change = true;
+					}
+
+					prev_change_event.quality = the_quality;
+					prev_change_event.err = false;
+				}
+				prev_change_event.inited = true;
 			}
-			prev_change_event.inited = true;
 
 			filterable_names.push_back("forced_event");
 			if (force_change == true)
@@ -4199,9 +4220,12 @@ void Attribute::fire_archive_event(DevFailed *except)
 
 		now = time(NULL);
 
-		archive3_subscription = now - event_archive3_subscription;
-		archive4_subscription = now - event_archive4_subscription;
-		archive5_subscription = now - event_archive5_subscription;
+		{
+			omni_mutex_lock oml(EventSupplier::get_event_mutex());
+			archive3_subscription = now - event_archive3_subscription;
+			archive4_subscription = now - event_archive4_subscription;
+			archive5_subscription = now - event_archive5_subscription;
+		}
 
 //
 // Get the event supplier(s)
@@ -4458,8 +4482,6 @@ void Attribute::fire_archive_event(DevFailed *except)
 		{
 
 //
-// Execute detect_change only to calculate the delta_change_rel and
-// delta_change_abs and force_change !
 //
 
 			bool force_change   = false;
@@ -4467,51 +4489,66 @@ void Attribute::fire_archive_event(DevFailed *except)
 			double delta_change_rel = 0.0;
 			double delta_change_abs = 0.0;
 
-            if (event_supplier_nd != NULL)
-                event_supplier_nd->detect_change(*this, ad,true,delta_change_rel,delta_change_abs,except,force_change,dev);
-            else if (event_supplier_zmq != NULL)
-                event_supplier_zmq->detect_change(*this, ad,true,delta_change_rel,delta_change_abs,except,force_change,dev);
+			{
+				omni_mutex_lock oml(EventSupplier::get_event_mutex());
 
+				// Execute detect_change only to calculate the delta_change_rel and
+				// delta_change_abs and force_change !
+
+				if (event_supplier_nd || event_supplier_zmq)
+				{
+					EventSupplier* event_supplier = event_supplier_nd ? event_supplier_nd : event_supplier_zmq;
+					event_supplier->detect_change(
+					    *this,
+					    ad,
+					    true,
+					    delta_change_rel,
+					    delta_change_abs,
+					    except,
+					    force_change,
+					    dev);
+				}
+
+				if (except != NULL)
+				{
+					prev_archive_event.err    = true;
+					prev_archive_event.except = *except;
+				}
+				else
+				{
+					Tango::AttrQuality the_quality;
+
+					if (send_attr_5 != Tango_nullptr)
+					{
+						prev_archive_event.value_4 = send_attr_5->value;
+						the_quality = send_attr_5->quality;
+					}
+					else if (send_attr_4 != Tango_nullptr)
+					{
+						prev_archive_event.value_4 = send_attr_4->value;
+						the_quality = send_attr_4->quality;
+					}
+					else
+					{
+						prev_archive_event.value = send_attr->value;
+						the_quality = send_attr->quality;
+					}
+
+					if (prev_archive_event.quality != the_quality)
+					{
+						quality_change = true;
+					}
+
+					prev_archive_event.quality = the_quality;
+					prev_archive_event.err = false;
+				}
+				prev_archive_event.inited = true;
+			}
 
 			vector<string> filterable_names;
 			vector<double> filterable_data;
 			vector<string> filterable_names_lg;
 			vector<long> filterable_data_lg;
-
-			if (except != NULL)
-			{
-				prev_archive_event.err    = true;
-				prev_archive_event.except = *except;
-			}
-			else
-			{
-				Tango::AttrQuality the_quality;
-
-				if (send_attr_5 != Tango_nullptr)
-				{
-					prev_archive_event.value_4 = send_attr_5->value;
-					the_quality = send_attr_5->quality;
-				}
-				else if (send_attr_4 != Tango_nullptr)
-				{
-					prev_archive_event.value_4 = send_attr_4->value;
-					the_quality = send_attr_4->quality;
-				}
-				else
-				{
-					prev_archive_event.value = send_attr->value;
-					the_quality = send_attr->quality;
-				}
-
-				if (prev_archive_event.quality != the_quality)
-				{
-					quality_change = true;
-				}
-
-				prev_archive_event.quality = the_quality;
-				prev_archive_event.err = false;
-			}
-			prev_archive_event.inited = true;
 
 			filterable_names.push_back("forced_event");
 			if (force_change == true)
@@ -4642,9 +4679,12 @@ void Attribute::fire_event(vector<string> &filt_names,vector<double> &filt_vals,
 
 		now = time(NULL);
 
-		user3_subscription = now - event_user3_subscription;
-		user4_subscription = now - event_user4_subscription;
-		user5_subscription = now - event_user5_subscription;
+		{
+			omni_mutex_lock oml(EventSupplier::get_event_mutex());
+			user3_subscription = now - event_user3_subscription;
+			user4_subscription = now - event_user4_subscription;
+			user5_subscription = now - event_user5_subscription;
+		}
 
 //
 // Get the event supplier(s)
@@ -4914,9 +4954,12 @@ void Attribute::fire_error_periodic_event(DevFailed *except)
 
 	now = time(NULL);
 
-	periodic3_subscription = now - event_periodic3_subscription;
-	periodic4_subscription = now - event_periodic4_subscription;
-	periodic5_subscription = now - event_periodic5_subscription;
+	{
+		omni_mutex_lock oml(EventSupplier::get_event_mutex());
+		periodic3_subscription = now - event_periodic3_subscription;
+		periodic4_subscription = now - event_periodic4_subscription;
+		periodic5_subscription = now - event_periodic5_subscription;
+	}
 
 	vector<int> client_libs = get_client_lib(PERIODIC_EVENT); 	// We want a copy
 
@@ -5284,7 +5327,7 @@ DeviceClass *Attribute::get_att_device_class(string &dev_name)
                 // Check whether our device is listed in this class
                 for (size_t i = 0; i < dev_list.size(); ++i)
                 {
-                    if (dev_list[i]->name() == dev_name)
+                    if (dev_list[i]->get_name() == dev_name)
                     {
                         // Our device is listed in this class, returns the corresponding DeviceClass pointer
                         return tmp_cl_list[loop];
@@ -5332,109 +5375,64 @@ void Attribute::log_quality()
         dev = tg->get_device_by_name(d_name);
     }
 
-//
-// Log something if the new quality is different than the old one
-//
+    const bool has_quality_changed = quality != old_quality;
+    const bool has_alarm_changed = alarm != old_alarm;
+    const bool is_alarm_set = alarm.any();
 
-    if (quality != old_quality)
+    if (has_quality_changed)
     {
-        if (alarm.any() == false)
+        if (! is_alarm_set)
         {
-
-//
-// No alarm detected
-//
-
-            switch(quality)
+            switch (quality)
             {
-                case ATTR_INVALID:
-                if (dev->get_logger()->is_error_enabled())
-                    dev->get_logger()->error_stream() << log4tango::LogInitiator::_begin_log << "INVALID quality for attribute " << name << endl;
+            case ATTR_INVALID:
+                DEV_ERROR_STREAM(dev) << "INVALID quality for attribute " << name << std::endl;
                 break;
 
-                case ATTR_CHANGING:
-                if (dev->get_logger()->is_info_enabled())
-                    dev->get_logger()->info_stream() << log4tango::LogInitiator::_begin_log << "CHANGING quality for attribute " << name << endl;
+            case ATTR_CHANGING:
+                DEV_INFO_STREAM(dev) << "CHANGING quality for attribute " << name << std::endl;
                 break;
 
-                case ATTR_VALID:
-                if (dev->get_logger()->is_info_enabled())
-                    dev->get_logger()->info_stream() << log4tango::LogInitiator::_begin_log << "VALID quality for attribute " << name << endl;
+            case ATTR_VALID:
+                DEV_INFO_STREAM(dev) << "INFO quality for attribute " << name << std::endl;
                 break;
 
-                default:
+            default:
                 break;
             }
         }
         else
         {
-
-//
-// Different log according to which alarm is set
-//
-
-            if (alarm[min_level] == true)
-            {
-                if (dev->get_logger()->is_error_enabled())
-                    dev->get_logger()->error_stream() << log4tango::LogInitiator::_begin_log << "MIN ALARM for attribute " << name << endl;
-            }
-            else if (alarm[max_level] == true)
-            {
-                if (dev->get_logger()->is_error_enabled())
-                    dev->get_logger()->error_stream() << log4tango::LogInitiator::_begin_log << "MAX ALARM for attribute " << name << endl;
-            }
-            else if (alarm[rds] == true)
-            {
-                if (dev->get_logger()->is_warn_enabled())
-                    dev->get_logger()->warn_stream() << log4tango::LogInitiator::_begin_log << "RDS (Read Different Set) ALARM for attribute " << name << endl;
-            }
-            else if (alarm[min_warn] == true)
-            {
-               if (dev->get_logger()->is_warn_enabled())
-                    dev->get_logger()->warn_stream() << log4tango::LogInitiator::_begin_log << "MIN WARNING for attribute " << name << endl;
-            }
-            else if (alarm[max_warn] == true)
-            {
-               if (dev->get_logger()->is_warn_enabled())
-                    dev->get_logger()->warn_stream() << log4tango::LogInitiator::_begin_log << "MAX WARNING for attribute " << name << endl;
-            }
+            log_alarm_quality();
         }
     }
-    else
+    else if (has_alarm_changed)
     {
+        log_alarm_quality();
+    }
+}
 
-//
-// The quality is the same but may be the alarm has changed
-//
-
-        if (alarm != old_alarm)
-        {
-            if (alarm[min_level] == true)
-            {
-                if (dev->get_logger()->is_error_enabled())
-                    dev->get_logger()->error_stream() << log4tango::LogInitiator::_begin_log << "MIN ALARM for attribute " << name << endl;
-            }
-            else if (alarm[max_level] == true)
-            {
-                if (dev->get_logger()->is_error_enabled())
-                    dev->get_logger()->error_stream() << log4tango::LogInitiator::_begin_log << "MAX ALARM for attribute " << name << endl;
-            }
-            else if (alarm[rds] == true)
-            {
-                if (dev->get_logger()->is_warn_enabled())
-                    dev->get_logger()->warn_stream() << log4tango::LogInitiator::_begin_log << "RDS (Read Different Set) ALARM for attribute " << name << endl;
-            }
-            else if (alarm[min_warn] == true)
-            {
-               if (dev->get_logger()->is_warn_enabled())
-                    dev->get_logger()->warn_stream() << log4tango::LogInitiator::_begin_log << "MIN WARNING for attribute " << name << endl;
-            }
-            else if (alarm[max_warn] == true)
-            {
-               if (dev->get_logger()->is_warn_enabled())
-                    dev->get_logger()->warn_stream() << log4tango::LogInitiator::_begin_log << "MAX WARNING for attribute " << name << endl;
-            }
-        }
+void Attribute::log_alarm_quality() const
+{
+    if (alarm[min_level])
+    {
+        DEV_ERROR_STREAM(dev) << "MIN ALARM for attribute " << name << std::endl;
+    }
+    else if (alarm[max_level])
+    {
+        DEV_ERROR_STREAM(dev) << "MAX ALARM for attribute " << name << std::endl;
+    }
+    else if (alarm[rds])
+    {
+        DEV_WARN_STREAM(dev) << "RDS (Read Different Set) ALARM for attribute " << name << std::endl;
+    }
+    else if (alarm[min_warn])
+    {
+        DEV_WARN_STREAM(dev) << "MIN WARNING for attribute " << name << std::endl;
+    }
+    else if (alarm[max_warn])
+    {
+        DEV_WARN_STREAM(dev) << "MAX WARNING for attribute " << name << std::endl;
     }
 }
 
